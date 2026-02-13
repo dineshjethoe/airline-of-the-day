@@ -1,0 +1,63 @@
+name: Build and Deploy to ACI
+
+on:
+  push:
+    branches: [ main ]  # or your default branch
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Log in to ACR
+        run: |
+          az acr login --name ${{ secrets.ACR_NAME }}
+
+      - name: Build and push Docker image
+        run: |
+          IMAGE_TAG="${{ secrets.ACR_NAME }}.azurecr.io/daily-airline:${{ github.sha }}"
+          docker build -t $IMAGE_TAG .
+          docker push $IMAGE_TAG
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+
+      - name: Delete existing container group (if exists)
+        run: |
+          az container delete \
+            --resource-group ${{ secrets.RESOURCE_GROUP }} \
+            --name daily-airline-job \
+            --yes \
+          || echo "Container group not found, skipping deletion"
+
+      - name: Create new container group
+        run: |
+          az container create \
+            --resource-group ${{ secrets.RESOURCE_GROUP }} \
+            --name daily-airline-job \
+            --image ${{ env.IMAGE_TAG }} \
+            --registry-login-server ${{ secrets.ACR_NAME }}.azurecr.io \
+            --registry-username ${{ secrets.ACR_USERNAME }} \
+            --registry-password ${{ secrets.ACR_PASSWORD }} \
+            --azure-file-volume-account-name ${{ secrets.STORAGE_ACCOUNT_NAME }} \
+            --azure-file-volume-account-key ${{ secrets.STORAGE_ACCOUNT_KEY }} \
+            --azure-file-volume-share-name ${{ secrets.SHARE_NAME }} \
+            --azure-file-volume-mount-path /mnt/data \
+            --os-type Linux \
+            --cpu 1 \
+            --memory 1.5 \
+            --environment-variables \
+                DATA_DIR=/mnt/data \
+                NINJAS_API_KEY='${{ secrets.NINJAS_API_KEY }}' \
+                AMADEUS_CLIENT_ID='${{ secrets.AMADEUS_CLIENT_ID }}' \
+                AMADEUS_CLIENT_SECRET='${{ secrets.AMADEUS_CLIENT_SECRET }}' \
+                SENDER_EMAIL='${{ secrets.SENDER_EMAIL }}' \
+                SENDER_APP_PASSWORD='${{ secrets.SENDER_APP_PASSWORD }}' \
+                RECIPIENT_EMAILS='${{ secrets.RECIPIENT_EMAILS }}' \
+                SENDER_NAME='${{ secrets.SENDER_NAME }}' \
+            --restart-policy Never
