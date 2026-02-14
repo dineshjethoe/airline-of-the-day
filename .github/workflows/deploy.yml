@@ -2,7 +2,7 @@ name: Build and Deploy to ACI
 
 on:
   push:
-    branches: [ main ]  # or your default branch
+    branches: [ main ]
 
 jobs:
   build-and-deploy:
@@ -14,15 +14,15 @@ jobs:
       - name: Log in to Azure
         uses: azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          creds: ${{ secrets.AZURE_CREDENTIALS }}   # if using service principal
 
       - name: Log in to ACR
         run: |
-          az acr login --name ${{ secrets.ACR_NAME }}
+          az acr login --name ${{ vars.ACR_NAME }}
 
       - name: Build and push Docker image
         run: |
-          IMAGE_TAG="${{ secrets.ACR_NAME }}.azurecr.io/daily-airline:${{ github.sha }}"
+          IMAGE_TAG="${{ vars.ACR_NAME }}.azurecr.io/daily-airline:${{ github.sha }}"
           docker build -t $IMAGE_TAG .
           docker push $IMAGE_TAG
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
@@ -30,7 +30,7 @@ jobs:
       - name: Delete existing container group (if exists)
         run: |
           az container delete \
-            --resource-group ${{ secrets.RESOURCE_GROUP }} \
+            --resource-group ${{ vars.RESOURCE_GROUP }} \
             --name daily-airline-job \
             --yes \
           || echo "Container group not found, skipping deletion"
@@ -38,15 +38,15 @@ jobs:
       - name: Create new container group
         run: |
           az container create \
-            --resource-group ${{ secrets.RESOURCE_GROUP }} \
+            --resource-group ${{ vars.RESOURCE_GROUP }} \
             --name daily-airline-job \
             --image ${{ env.IMAGE_TAG }} \
-            --registry-login-server ${{ secrets.ACR_NAME }}.azurecr.io \
-            --registry-username ${{ secrets.ACR_USERNAME }} \
+            --registry-login-server ${{ vars.ACR_NAME }}.azurecr.io \
+            --registry-username ${{ vars.ACR_NAME }} \
             --registry-password ${{ secrets.ACR_PASSWORD }} \
-            --azure-file-volume-account-name ${{ secrets.STORAGE_ACCOUNT_NAME }} \
+            --azure-file-volume-account-name ${{ vars.STORAGE_ACCOUNT_NAME }} \
             --azure-file-volume-account-key ${{ secrets.STORAGE_ACCOUNT_KEY }} \
-            --azure-file-volume-share-name ${{ secrets.SHARE_NAME }} \
+            --azure-file-volume-share-name ${{ vars.SHARE_NAME }} \
             --azure-file-volume-mount-path /mnt/data \
             --os-type Linux \
             --cpu 1 \
@@ -56,8 +56,8 @@ jobs:
                 NINJAS_API_KEY='${{ secrets.NINJAS_API_KEY }}' \
                 AMADEUS_CLIENT_ID='${{ secrets.AMADEUS_CLIENT_ID }}' \
                 AMADEUS_CLIENT_SECRET='${{ secrets.AMADEUS_CLIENT_SECRET }}' \
-                SENDER_EMAIL='${{ secrets.SENDER_EMAIL }}' \
+                SENDER_EMAIL='${{ vars.SENDER_EMAIL }}' \
                 SENDER_APP_PASSWORD='${{ secrets.SENDER_APP_PASSWORD }}' \
-                RECIPIENT_EMAILS='${{ secrets.RECIPIENT_EMAILS }}' \
-                SENDER_NAME='${{ secrets.SENDER_NAME }}' \
+                RECIPIENT_EMAILS='${{ vars.RECIPIENT_EMAILS }}' \
+                SENDER_NAME='${{ vars.SENDER_NAME }}' \
             --restart-policy Never
