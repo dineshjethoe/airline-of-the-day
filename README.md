@@ -50,7 +50,7 @@ The goal is to learn about different airlines every day, a fun way to discover a
 | **Azure Logic Apps** | Schedule daily execution. | ACI has no built-in scheduler; Logic Apps provides a reliable, low-cost trigger. |
 | **Resource Group** | Logical container for all resources. | Organises and manages permissions together. |
 
-Optionally, you can also use a **self-hosted GitHub Actions runner** on a small Azure VM if you cannot create a service principal (see [alternative setup](docs/setup.md)).
+[Here](docs/setup.md) are the instructions of how to create all the required Azure resources and configure GitHub Actions using a service principal.
 
 ---
 
